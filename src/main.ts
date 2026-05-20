@@ -7,7 +7,7 @@ import filtersRoutes from './routes/filters.routes';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  const port = process.env.PORT || 3000
   app.enableCors();
   
   app.useGlobalPipes(
@@ -19,7 +19,7 @@ async function bootstrap() {
   );
   app.use('/filters', filtersRoutes);
 
-  await app.listen(3000);
+  await app.listen(port);
 }
 
 bootstrap();
