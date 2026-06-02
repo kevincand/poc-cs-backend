@@ -15,6 +15,8 @@ import {
 
 import { AnalysesService } from './analyses.service';
 
+import { NiraService } from '@/integrations/nira/nira.service';
+
 import {
     AnalysisStatus,
     UpdateStatusDto,
@@ -24,6 +26,7 @@ import {
 export class AnalysesController {
     constructor(
         private readonly analysesService: AnalysesService,
+        private readonly niraService: NiraService,
     ) { }
 
     @Get()
@@ -62,5 +65,15 @@ export class AnalysesController {
             uuid,
             body.status,
         );
+    }
+
+    @Get(':uuid/spectrum')
+    getSpectrum(
+        @Param('uuid') uuid: string,
+        @Headers('authorization') auth: string,
+    ) {
+        const token = auth?.replace('Bearer ', '');
+        
+        return this.niraService.getSpectro(token, uuid);
     }
 }

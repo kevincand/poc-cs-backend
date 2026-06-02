@@ -70,4 +70,27 @@ export class NiraService {
     throw error;
   }
 }
+  async getSpectro(token: string, uuid: string) {
+    
+  try {
+    const response = await firstValueFrom(
+      this.httpService.get(`${this.apiUrl}/analises/espectrosByAnaliseUuid/${uuid}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      }),
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      'NIRA w ERROR:',
+      error.response?.data || error.message,
+    );
+
+    throw error;
+  }
+}
 }
