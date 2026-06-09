@@ -22,6 +22,10 @@ import {
     UpdateStatusDto,
 } from './dto/update-status.dto';
 
+import {
+    UpdateSpectrumQualityDto,
+} from './dto/spectrum-quality.dto';
+
 @Controller('analyses')
 export class AnalysesController {
     constructor(
@@ -73,7 +77,37 @@ export class AnalysesController {
         @Headers('authorization') auth: string,
     ) {
         const token = auth?.replace('Bearer ', '');
-        
+
         return this.niraService.getSpectro(token, uuid);
+    }
+
+    @Patch(':uuid/spectrum-quality')
+    async updateSpectrumQuality(
+        @Param('uuid') uuid: string,
+
+        @Body() body: UpdateSpectrumQualityDto,
+
+        @Headers('x-user-role') role: string,
+
+        @Headers('authorization') auth: string,
+    ) {
+        const token = auth?.replace('Bearer ', '');
+
+        if (!token) {
+            throw new ForbiddenException(
+                'Token inválido',
+            );
+        }
+
+        if (role !== 'ADMIN') {
+            throw new ForbiddenException(
+                'Usuário sem permissão',
+            );
+        }
+
+        return this.analysesService.updateSpectrumQuality(
+            uuid,
+            body,
+        );
     }
 }

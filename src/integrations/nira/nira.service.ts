@@ -86,7 +86,7 @@ export class NiraService {
     return response.data;
   } catch (error: any) {
     console.error(
-      'NIRA w ERROR:',
+      'NIRA SPECTRUM ERROR:',
       error.response?.data || error.message,
     );
 

@@ -7,6 +7,10 @@ import { NiraService } from '@/integrations/nira/nira.service';
 import { extractSampleGroup } from '@/common/utils/extract-sample-group';
 import { AnalysisStatus } from './dto/update-status.dto';
 
+import {
+    UpdateSpectrumQualityDto,
+} from './dto/spectrum-quality.dto';
+
 @Injectable()
 export class AnalysesService {
     constructor(
@@ -52,6 +56,8 @@ export class AnalysesService {
                 proteina > 47 ||
                 umidade > 12.5;
 
+            const savedStatus = statusMap.get(item.uuid);
+
             return {
                 uuid: item.uuid,
 
@@ -82,6 +88,10 @@ export class AnalysesService {
                 status:
                     statusMap.get(item.uuid)?.status || 'PENDENTE',
 
+                spectrumScore: savedStatus?.spectrumScore ?? null,
+
+                spectrumStatus: savedStatus?.spectrumStatus ?? null,
+
                 hasAlert,
             };
         });
@@ -110,6 +120,31 @@ export class AnalysesService {
             create: {
                 analysisUuid: uuid,
                 status,
+            },
+        });
+    }
+
+    async updateSpectrumQuality(
+        uuid: string,
+        data: UpdateSpectrumQualityDto,
+    ) {
+        return this.prisma.analysisStatusControl.upsert({
+            where: {
+                analysisUuid: uuid,
+            },
+
+            update: {
+                spectrumScore: data.spectrumScore,
+
+                spectrumStatus: data.spectrumStatus,
+            },
+
+            create: {
+                analysisUuid: uuid,
+
+                spectrumScore: data.spectrumScore,
+
+                spectrumStatus: data.spectrumStatus,
             },
         });
     }

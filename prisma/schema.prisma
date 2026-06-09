@@ -13,10 +13,20 @@ enum AnalysisStatus {
   CONFERIDO
 }
 
+enum SpectrumStatus {
+  OK
+  WARNING
+  MOTOR_STOPPED
+  BAD_SPECTRUM
+}
+
 model AnalysisStatusControl {
   id            String           @id @default(cuid())
   analysisUuid  String           @unique
   status        AnalysisStatus   @default(PENDENTE)
+
+  spectrumScore  Int?
+  spectrumStatus SpectrumStatus?
 
   updatedBy     String?
   updatedAt     DateTime         @updatedAt
