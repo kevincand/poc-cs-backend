@@ -15,6 +15,10 @@ import {
 
 import { WhatsappService } from '@/shared/whatsapp.service';
 import { TwilioService } from '@/shared/twilio.service';
+import {
+  SpectrumReportMemoryService,
+  SpectrumReportItem,
+} from './spectrum-report-memory.service';
 
 type ExternalAnalysis = {
   uuid: string;
@@ -45,6 +49,7 @@ export class SpectrumCronService {
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsappService,
     private readonly twilio: TwilioService,
+    private readonly reportMemory: SpectrumReportMemoryService,
   ) { }
   @Cron('0 0 8-22 * * *', {
     timeZone: 'America/Sao_Paulo',
@@ -89,6 +94,7 @@ export class SpectrumCronService {
     }
     console.log(pendingAnalyses);
     const reportItems: string[] = [];
+    const analyzedReportItems: SpectrumReportItem[] = [];
 
     for (const analysis of pendingAnalyses) {
       try {
@@ -100,6 +106,12 @@ export class SpectrumCronService {
         const result = analyzeSpectrumData(
           spectrum as SpectralApiResponse,
         );
+        const structuredItem = this.buildStructuredReportItem(
+          analysis,
+          result,
+        );
+
+        analyzedReportItems.push(structuredItem);
 
         await this.prisma.analysisStatusControl.upsert(
           {
@@ -145,6 +157,47 @@ export class SpectrumCronService {
       }
     }
 
+    this.saveLatestSpectrumReportInMemory(
+      start,
+      end,
+      analyses.length,
+      pendingAnalyses.length,
+      analyzedReportItems,
+      reportItems,
+    );
+    if (!analyses.length) {
+      this.logger.log(
+        'Nenhuma análise encontrada no período.',
+      );
+
+      this.saveLatestSpectrumReportInMemory(
+        start,
+        end,
+        0,
+        0,
+        [],
+        [],
+      );
+
+      return;
+    }
+    if (!pendingAnalyses.length) {
+      this.logger.log(
+        'Nenhuma análise pendente encontrada.',
+      );
+
+      this.saveLatestSpectrumReportInMemory(
+        start,
+        end,
+        analyses.length,
+        0,
+        [],
+        [],
+      );
+
+      return;
+    }
+
     if (reportItems.length > 0) {
       await this.sendWhatsappReport(
         start,
@@ -162,6 +215,8 @@ export class SpectrumCronService {
     this.logger.log(
       'Rotina de análise espectral finalizada.',
     );
+
+
   }
   private buildNiraDayDate(date: DateTime) {
     return `${date.toFormat('yyyy-MM-dd')}T12:00:00.000Z`;
@@ -302,13 +357,22 @@ export class SpectrumCronService {
         item.status,
       ]),
     );
+    const scoreMap = new Map(
+      saved.map((item) => [
+        item.analysisUuid,
+        item.spectrumScore,
+      ]),
+    );
 
     return analyses.filter((analysis) => {
       const status =
         statusMap.get(analysis.uuid) ||
         'PENDENTE';
 
-      return status === 'PENDENTE';
+      const spectrumScore =
+        scoreMap.get(analysis.uuid) ?? null;
+
+      return status === 'PENDENTE' && spectrumScore === null;;
     });
   }
 
@@ -405,7 +469,7 @@ export class SpectrumCronService {
       await this.whatsapp.sendMessage(
         to,
         chunk,
-      ); 
+      );
       /* await this.twilio.sendMessage(
         to,
         chunk,
@@ -450,4 +514,117 @@ export class SpectrumCronService {
       maximumFractionDigits: 2,
     });
   }
+  private buildStructuredReportItem(
+    analysis: ExternalAnalysis,
+    result: any,
+  ): SpectrumReportItem {
+    const proteina = this.getResultValue(
+      analysis,
+      'Proteína',
+    );
+
+    const oleo = this.getResultValue(
+      analysis,
+      'Óleo',
+    );
+
+    const umidade = this.getResultValue(
+      analysis,
+      'Umidade',
+    );
+
+    const criticalFlags = result.flags.filter(
+      (flag: any) => flag.severity === 'critical',
+    ).length;
+
+    const warningFlags = result.flags.filter(
+      (flag: any) => flag.severity === 'warning',
+    ).length;
+
+    return {
+      uuid: analysis.uuid,
+
+      amostra: this.extractSampleName(analysis.nome),
+
+      grao: analysis.grao,
+
+      criadoEm: analysis.criadoEm,
+
+      operacao: analysis.criadoPor?.nome || '-',
+
+      placa: analysis.nirNumSerie || '-',
+
+      proteina,
+
+      oleo,
+
+      umidade,
+
+      score: result.score,
+
+      spectrumStatus: result.status,
+
+      flagsCount: result.flags.length,
+
+      criticalFlags,
+
+      warningFlags,
+
+      flags: result.flags,
+    };
+  }
+  private saveLatestSpectrumReportInMemory(
+    start: DateTime,
+    end: DateTime,
+    totalInRange: number,
+    totalPending: number,
+    analyzedItems: SpectrumReportItem[],
+    reportedMessages: string[],
+  ) {
+    const message =
+      reportedMessages.length > 0
+        ? [
+          `🚨 Relatório de Espectros Críticos`,
+          ``,
+          `Período: ${start.toFormat('dd/MM/yyyy HH:mm')} até ${end.toFormat('dd/MM/yyyy HH:mm')}`,
+          `Total sinalizado: ${reportedMessages.length}`,
+          ``,
+          reportedMessages
+            .map(
+              (item, index) =>
+                `#${index + 1}\n${item}`,
+            )
+            .join('\n\n--------------------\n\n'),
+        ].join('\n')
+        : null;
+
+    this.reportMemory.setLatestReport({
+      periodStart: start.toISO() || '',
+
+      periodEnd: end.toISO() || '',
+
+      executedAt: DateTime.now()
+        .setZone('America/Sao_Paulo')
+        .toISO() || '',
+
+      totalInRange,
+
+      totalPending,
+
+      totalAnalyzed: analyzedItems.length,
+
+      totalReported: reportedMessages.length,
+
+      items: analyzedItems,
+
+      reportedItems: reportedMessages,
+
+      message,
+    });
+
+    this.logger.log(
+      `Relatório em memória atualizado. Analisadas: ${analyzedItems.length}. Sinalizadas: ${reportedMessages.length}.`,
+    );
+  }
+
 }

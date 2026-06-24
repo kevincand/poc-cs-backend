@@ -26,11 +26,14 @@ import {
     UpdateSpectrumQualityDto,
 } from './dto/spectrum-quality.dto';
 
+import { SpectrumReportMemoryService } from './services/spectrum-report-memory.service';
+
 @Controller('analyses')
 export class AnalysesController {
     constructor(
         private readonly analysesService: AnalysesService,
         private readonly niraService: NiraService,
+        private readonly reportMemory: SpectrumReportMemoryService,
     ) { }
 
     @Get()
@@ -109,5 +112,9 @@ export class AnalysesController {
             uuid,
             body,
         );
+    }
+    @Get('spectrum-report/latest')
+    getLatestSpectrumReport() {
+        return this.reportMemory.getLatestReport();
     }
 }
