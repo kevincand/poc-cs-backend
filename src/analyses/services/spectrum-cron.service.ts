@@ -12,6 +12,7 @@ import {
   analyzeSpectrumData,
   SpectralApiResponse
 } from '@/analyses/utils/spectral.analysis';
+import { analyzeSoybeanSpectrumData } from '@/analyses/utils/spectrum.soybean.analysis';
 
 import { WhatsappService } from '@/shared/whatsapp.service';
 import { TwilioService } from '@/shared/twilio.service';
@@ -103,9 +104,10 @@ export class SpectrumCronService {
             analysis.uuid,
           );
 
-        const result = analyzeSpectrumData(
-          spectrum as SpectralApiResponse,
-        );
+        const result = analysis.grao === 'SOJA'
+          ? analyzeSoybeanSpectrumData(spectrum as SpectralApiResponse)
+          : analyzeSpectrumData(spectrum as SpectralApiResponse);
+
         const structuredItem = this.buildStructuredReportItem(
           analysis,
           result,
