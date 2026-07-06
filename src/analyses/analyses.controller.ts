@@ -28,12 +28,15 @@ import {
 
 import { SpectrumReportMemoryService } from './services/spectrum-report-memory.service';
 
+import { DailyReportService } from './services/daily-report.service';
+
 @Controller('analyses')
 export class AnalysesController {
     constructor(
         private readonly analysesService: AnalysesService,
         private readonly niraService: NiraService,
         private readonly reportMemory: SpectrumReportMemoryService,
+        private readonly dailyReportService: DailyReportService,
     ) { }
 
     @Get()
@@ -116,5 +119,18 @@ export class AnalysesController {
     @Get('spectrum-report/latest')
     getLatestSpectrumReport() {
         return this.reportMemory.getLatestReport();
+    }
+    
+    @Get('daily-report')
+    getDailyReport(
+        @Query('date') date: string,
+        @Query('uuidUsuarios') uuidUsuarios?: string,
+        @Query('grao') grao?: string,
+    ) {
+        return this.dailyReportService.generateDailyReport({
+            date,
+            uuidUsuarios,
+            grao,
+        });
     }
 }

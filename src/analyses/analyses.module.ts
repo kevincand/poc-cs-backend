@@ -9,12 +9,16 @@ import { SpectrumCronService } from './services/spectrum-cron.service';
 import { WhatsappService } from '@/shared/whatsapp.service';
 import { TwilioService } from '@/shared/twilio.service';
 import { SpectrumReportMemoryService } from './services/spectrum-report-memory.service';
+import { DailyReportService } from './services/daily-report.service';
+import { NiraAuthService } from '@/shared/nira-auth.service';
 
 @Module({
   imports: [NiraModule],
 
   controllers: [AnalysesController],
 
-  providers: [AnalysesService, SpectrumCronService, WhatsappService, TwilioService, SpectrumReportMemoryService],
+  providers: [AnalysesService, SpectrumCronService, WhatsappService, 
+    TwilioService, SpectrumReportMemoryService, DailyReportService, 
+    NiraAuthService],
 })
 export class AnalysesModule {}

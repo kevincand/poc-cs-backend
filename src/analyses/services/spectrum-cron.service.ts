@@ -21,6 +21,8 @@ import {
   SpectrumReportItem,
 } from './spectrum-report-memory.service';
 
+import { NiraAuthService } from '@/shared/nira-auth.service';
+
 type ExternalAnalysis = {
   uuid: string;
   nome: string;
@@ -51,6 +53,7 @@ export class SpectrumCronService {
     private readonly whatsapp: WhatsappService,
     private readonly twilio: TwilioService,
     private readonly reportMemory: SpectrumReportMemoryService,
+    private readonly niraAuth: NiraAuthService,
   ) { }
   @Cron('0 0 8-22 * * *', {
     timeZone: 'America/Sao_Paulo',
@@ -285,7 +288,9 @@ export class SpectrumCronService {
 
     const apiDate = this.buildNiraDayDate(start);
 
-    const response = await axios.get(
+    const response = await this.niraGet<{
+      content: ExternalAnalysis[];
+    }>(
       `${process.env.NIRA_API_URL}/analises`,
       {
         headers: {
@@ -317,7 +322,7 @@ export class SpectrumCronService {
     );
 
     const content: ExternalAnalysis[] =
-      response.data.content || [];
+      response?.content || [];
 
     const filteredByHour = content.filter(
       (analysis) =>
@@ -384,7 +389,7 @@ export class SpectrumCronService {
     const token =
       process.env.NIRA_ACCESS_TOKEN;
 
-    const response = await axios.get(
+    const response = await this.niraGet(
       `${process.env.NIRA_API_URL}/analises/espectrosByAnaliseUuid/${uuid}`,
       {
         headers: {
@@ -393,7 +398,7 @@ export class SpectrumCronService {
       },
     );
 
-    return response.data;
+    return response;
   }
 
   private buildReportItem(
@@ -628,5 +633,45 @@ export class SpectrumCronService {
       `Relatório em memória atualizado. Analisadas: ${analyzedItems.length}. Sinalizadas: ${reportedMessages.length}.`,
     );
   }
+  private async niraGet<T>(
+    url: string,
+    config: any = {},
+    retry = true,
+  ): Promise<T> {
+    const token = await this.niraAuth.getToken();
 
+    try {
+      const response = await axios.get<T>(url, {
+        ...config,
+
+        headers: {
+          ...(config.headers || {}),
+
+          Authorization: `Bearer ${token}`,
+
+          Accept: 'application/json',
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      const status = error?.response?.status;
+
+      if (status === 401 && retry) {
+        this.logger.warn(
+          'Requisição NIRA retornou 401. Renovando token e tentando novamente...',
+        );
+
+        await this.niraAuth.refreshToken();
+
+        return this.niraGet<T>(
+          url,
+          config,
+          false,
+        );
+      }
+
+      throw error;
+    }
+  }
 }
