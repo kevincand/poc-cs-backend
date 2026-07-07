@@ -473,10 +473,11 @@ export class SpectrumCronService {
     const messageSplits = message.match(/.{1,4000}/g) || [];
 
     for (const chunk of messageSplits) {
-      await this.whatsapp.sendMessage(
+      /* await this.whatsapp.sendMessage(
         to,
         chunk,
-      );
+      ); */
+      console.log(`Mensagem a ser enviada para ${to}:\n${chunk}`);
       /* await this.twilio.sendMessage(
         to,
         chunk,
