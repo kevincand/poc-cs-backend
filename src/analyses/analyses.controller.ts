@@ -123,12 +123,14 @@ export class AnalysesController {
     
     @Get('daily-report')
     getDailyReport(
-        @Query('date') date: string,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
         @Query('uuidUsuarios') uuidUsuarios?: string,
         @Query('grao') grao?: string,
     ) {
         return this.dailyReportService.generateDailyReport({
-            date,
+            startDate,
+            endDate,
             uuidUsuarios,
             grao,
         });

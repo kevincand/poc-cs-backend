@@ -15,6 +15,7 @@ import {
   DailyReportResult,
   OperatorDailySummary,
   RepeatedSampleGroup,
+  GrainSummary,
 } from '../types/daily-report.types';
 
 type ExternalAnalysis = {
@@ -48,7 +49,7 @@ export class DailyReportService {
 
   constructor(
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async generateDailyReport(
     query: DailyReportQuery,
@@ -61,6 +62,16 @@ export class DailyReportService {
         analysesFromApi,
       );
 
+    const sampleAverages =
+      this.buildSampleAverages(
+        analyses,
+      );
+
+    const grainSummary =
+      this.buildGrainSummary(
+        analyses,
+      );
+
     const repeatedGroups =
       this.findRepeatedSamples(analyses);
 
@@ -71,20 +82,21 @@ export class DailyReportService {
       );
 
     const result: DailyReportResult = {
-      date: query.date,
+      startDate: query.startDate,
+      endDate: query.endDate,
 
       totalAnalyses: analyses.length,
 
       avgProteina: this.average(
-        analyses.map((item) => item.proteina),
+        sampleAverages.map((item) => item.proteina),
       ),
 
       avgUmidade: this.average(
-        analyses.map((item) => item.umidade),
+        sampleAverages.map((item) => item.umidade),
       ),
 
       avgOleo: this.average(
-        analyses.map((item) => item.oleo),
+        sampleAverages.map((item) => item.oleo),
       ),
 
       spectrumOkCount: analyses.filter(
@@ -117,6 +129,8 @@ export class DailyReportService {
       ),
 
       analyses,
+
+      grainSummary,
     };
 
     return result;
@@ -127,7 +141,8 @@ export class DailyReportService {
   ): Promise<ExternalAnalysis[]> {
     const token = process.env.NIRA_ACCESS_TOKEN;
 
-    const apiDate = `${query.date}T12:00:00.000Z`;
+    const apiStartDate = `${query.startDate}T12:00:00.000Z`;
+    const apiEndDate = `${query.endDate}T12:00:00.000Z`;
 
     const result: ExternalAnalysis[] = [];
 
@@ -159,9 +174,9 @@ export class DailyReportService {
 
             absNumSerie: '',
 
-            startDate: apiDate,
+            startDate: apiStartDate,
 
-            endDate: apiDate,
+            endDate: apiEndDate,
 
             sort: 'criadoEm,desc',
 
@@ -292,8 +307,22 @@ export class DailyReportService {
   }
 
   private findRepeatedSamples(
+  analyses: DailyReportAnalysis[],
+): RepeatedSampleGroup[] {
+
+  return this
+    .buildSampleGroups(analyses)
+    .filter(group => group.length > 1)
+    .map(group =>
+      this.buildRepeatedGroup(group),
+    );
+
+}
+
+  private buildSampleGroups(
     analyses: DailyReportAnalysis[],
-  ): RepeatedSampleGroup[] {
+  ): DailyReportAnalysis[][] {
+
     const sorted = [...analyses].sort(
       (a, b) =>
         new Date(a.criadoEm).getTime() -
@@ -303,11 +332,10 @@ export class DailyReportService {
     const groups: DailyReportAnalysis[][] = [];
 
     for (const analysis of sorted) {
+
       const createdAt = DateTime.fromISO(
         analysis.criadoEm,
-        {
-          zone: 'utc',
-        },
+        { zone: 'utc' },
       );
 
       let matchedGroup:
@@ -315,16 +343,18 @@ export class DailyReportService {
         | undefined;
 
       for (const group of groups) {
+
         const first = group[0];
 
-        const firstCreatedAt =
-          DateTime.fromISO(first.criadoEm, {
-            zone: 'utc',
-          });
+        const firstCreated =
+          DateTime.fromISO(
+            first.criadoEm,
+            { zone: 'utc' },
+          );
 
         const minutesDiff = Math.abs(
           createdAt.diff(
-            firstCreatedAt,
+            firstCreated,
             'minutes',
           ).minutes,
         );
@@ -339,20 +369,20 @@ export class DailyReportService {
           analysis.operadorUuid &&
           first.operadorUuid &&
           analysis.operadorUuid ===
-            first.operadorUuid;
+          first.operadorUuid;
 
-        const sameOrSimilarSample =
+        const sameSample =
           analysis.sampleKey ===
-            first.sampleKey ||
+          first.sampleKey ||
           similarity >= 0.86;
 
         const closeTime =
           minutesDiff <= 90;
 
         if (
-          sameOrSimilarSample &&
-          closeTime &&
-          sameOperator
+          sameSample &&
+          sameOperator &&
+          closeTime
         ) {
           matchedGroup = group;
           break;
@@ -366,11 +396,7 @@ export class DailyReportService {
       }
     }
 
-    return groups
-      .filter((group) => group.length > 1)
-      .map((group) =>
-        this.buildRepeatedGroup(group),
-      );
+    return groups;
   }
 
   private buildRepeatedGroup(
@@ -424,7 +450,7 @@ export class DailyReportService {
       (item) =>
         item.spectrumStatus === 'BAD_SPECTRUM' ||
         item.spectrumStatus ===
-          'MOTOR_STOPPED',
+        'MOTOR_STOPPED',
     );
 
     const hasWarning = group.some(
@@ -443,7 +469,7 @@ export class DailyReportService {
     const proteinRange =
       proteinValues.length > 1
         ? Math.max(...proteinValues) -
-          Math.min(...proteinValues)
+        Math.min(...proteinValues)
         : 0;
 
     if (hasBadSpectrum) {
@@ -465,12 +491,17 @@ export class DailyReportService {
     analyses: DailyReportAnalysis[],
     repeatedGroups: RepeatedSampleGroup[],
   ): OperatorDailySummary[] {
+    const sampleAverages =
+      this.buildSampleAverages(
+        analyses,
+      );
+
     const operatorMap = new Map<
       string,
       DailyReportAnalysis[]
     >();
 
-    for (const analysis of analyses) {
+    for (const analysis of sampleAverages) {
       const key =
         analysis.operadorUuid ||
         analysis.operadorNome;
@@ -500,7 +531,11 @@ export class DailyReportService {
           operadorUuid:
             items[0]?.operadorUuid,
 
-          totalAnalyses: items.length,
+          totalAnalyses: analyses.filter(
+            i =>
+              (i.operadorUuid ||
+                i.operadorNome) === key
+          ).length,
 
           avgProteina: this.average(
             items.map(
@@ -773,4 +808,92 @@ export class DailyReportService {
 
     return 1 - distance / maxLength;
   }
+  private buildSampleAverages(
+  analyses: DailyReportAnalysis[],
+): DailyReportAnalysis[] {
+
+  const groups =
+    this.buildSampleGroups(
+      analyses,
+    );
+
+  return groups.map(group => ({
+
+    ...group[0],
+
+    proteina:
+      this.average(
+        group.map(
+          a => a.proteina,
+        ),
+      ),
+
+    umidade:
+      this.average(
+        group.map(
+          a => a.umidade,
+        ),
+      ),
+
+    oleo:
+      this.average(
+        group.map(
+          a => a.oleo,
+        ),
+      ),
+
+  }));
+
+}
+  private buildGrainSummary(
+    analyses: DailyReportAnalysis[],
+  ) {
+
+    const graos = [
+      'FARELO_SOJA',
+      'SOJA',
+      'MILHO',
+    ];
+
+    return graos
+      .map((grao): GrainSummary | null => {
+
+        const analysesGrao = analyses.filter(
+          a => a.grao === grao,
+        );
+
+        if (!analysesGrao.length) {
+          return null;
+        }
+
+        const samples =
+          this.buildSampleAverages(analysesGrao);
+
+        return {
+          grao,
+
+          totalAnalyses: analysesGrao.length,
+
+          totalSamples: samples.length,
+
+          avgProteina: this.average(
+            samples.map(s => s.proteina),
+          ),
+
+          avgUmidade: this.average(
+            samples.map(s => s.umidade),
+          ),
+
+          avgOleo: this.average(
+            samples.map(s => s.oleo),
+          ),
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is GrainSummary => item !== null,
+      );
+  }
+
 }

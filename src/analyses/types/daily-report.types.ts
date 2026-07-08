@@ -1,5 +1,6 @@
 export type DailyReportQuery = {
-  date: string;
+  startDate: string;
+  endDate: string;
   uuidUsuarios?: string;
   grao?: string;
 };
@@ -61,7 +62,8 @@ export type OperatorDailySummary = {
 };
 
 export type DailyReportResult = {
-  date: string;
+  startDate: string;
+  endDate: string;
 
   totalAnalyses: number;
 
@@ -81,4 +83,20 @@ export type DailyReportResult = {
   insights: string[];
 
   analyses: DailyReportAnalysis[];
+
+  grainSummary: GrainSummary[];
+};
+
+export type GrainSummary = {
+  grao: string;
+
+  totalAnalyses: number;
+
+  totalSamples: number;
+
+  avgProteina: number | null;
+
+  avgUmidade: number | null;
+
+  avgOleo: number | null;
 };
