@@ -3,6 +3,7 @@ export type DailyReportQuery = {
   endDate: string;
   uuidUsuarios?: string;
   grao?: string;
+  token: string;
 };
 
 export type DailyReportAnalysis = {

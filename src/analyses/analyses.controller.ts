@@ -117,7 +117,23 @@ export class AnalysesController {
         );
     }
     @Get('spectrum-report/latest')
-    getLatestSpectrumReport() {
+    getLatestSpectrumReport(
+        @Headers('authorization') auth: string,
+        @Headers('x-user-role') role: string,
+
+    ) {
+        const token = auth?.replace('Bearer ', '');
+
+        if (!token) {
+            throw new ForbiddenException(
+                'Token inválido',
+            );
+        }
+        if (role !== 'ADMIN') {
+            throw new ForbiddenException(
+                'Usuário sem permissão',
+            );
+        }
         return this.reportMemory.getLatestReport();
     }
     
@@ -127,12 +143,27 @@ export class AnalysesController {
         @Query('endDate') endDate: string,
         @Query('uuidUsuarios') uuidUsuarios?: string,
         @Query('grao') grao?: string,
+        @Headers('authorization') auth?: string,
+        @Headers('x-user-role') role?: string,
     ) {
+        const token = auth?.replace('Bearer ', '');
+
+        if (!token) {
+            throw new ForbiddenException(
+                'Token inválido',
+            );
+        }
+        if (role !== 'ADMIN') {
+            throw new ForbiddenException(
+                'Usuário sem permissão',
+            );
+        }
         return this.dailyReportService.generateDailyReport({
             startDate,
             endDate,
             uuidUsuarios,
             grao,
+            token
         });
     }
 }

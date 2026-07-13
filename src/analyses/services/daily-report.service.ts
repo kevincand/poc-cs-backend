@@ -139,10 +139,10 @@ export class DailyReportService {
   private async fetchAnalysesFromNira(
     query: DailyReportQuery,
   ): Promise<ExternalAnalysis[]> {
-    const token = process.env.NIRA_ACCESS_TOKEN;
 
     const apiStartDate = `${query.startDate}T12:00:00.000Z`;
     const apiEndDate = `${query.endDate}T12:00:00.000Z`;
+    const token = query.token
 
     const result: ExternalAnalysis[] = [];
 

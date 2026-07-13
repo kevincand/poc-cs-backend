@@ -19,11 +19,11 @@ router.get('/', async (req, res) => {
     );
 
     return res.json(response.data);
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
 
     return res
-      .status(500)
+      .status(error?.status ? error.status : 500)
       .json({
         error:
           'Erro ao buscar filtros',
